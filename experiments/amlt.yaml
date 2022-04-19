@@ -18,6 +18,7 @@ environment:
    - pip install transformers==4.10.3
    - pip install tokenizers==0.10.3
    - pip install datasets==1.12.1
+   - pip install adapter-transformers
 
 # Experiment source code. This section is optional.
 # $CONFIG_DIR is expanded to the directory of this config file.
@@ -56,3 +57,70 @@ jobs:
         --save_steps 36813
         --eval_all_checkpoints 
         --seed 57
+  - name: BERT-unstructured-pruning-mnli-part2
+    sku: G1
+    command:
+      - python glue_trans.py
+       --dir pre
+       --mask_dir /mnt/output_path/BERT-Tickets/mnli/checkpoint-257691/mask.pt
+       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2/checkpoint-257691
+       --logging_steps 12271
+       --task_name mnli
+       --cache_dir /mnt/output_path/BERT-Tickets/mnli
+       --model_name_or_path bert-base-uncased
+       --do_train
+       --do_eval
+       --max_seq_length 128
+       --per_gpu_train_batch_size 32
+       --learning_rate 2e-5
+       --num_train_epochs 3
+       --overwrite_output_dir
+       --evaluate_during_training
+       --save_steps 0
+       --eval_all_checkpoints
+       --seed 5
+  - name: BERT-unstructured-pruning-mnli-part2-full+adapters
+    sku: G1
+    command:
+      - python glue_trans_w_adapters.py
+       --dir pre
+       --mask_dir /mnt/output_path/BERT-Tickets/mnli/checkpoint-257691/mask.pt
+       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2/checkpoint-257691
+       --logging_steps 12271
+       --task_name mnli
+       --cache_dir /mnt/output_path/BERT-Tickets/mnli
+       --model_name_or_path bert-base-uncased
+       --do_train
+       --do_eval
+       --max_seq_length 128
+       --per_gpu_train_batch_size 32
+       --learning_rate 2e-5
+       --num_train_epochs 3
+       --overwrite_output_dir
+       --evaluate_during_training
+       --save_steps 0
+       --eval_all_checkpoints
+       --seed 5
+  - name: BERT-unstructured-pruning-mnli-part2-only_adapters
+    sku: G1
+    command:
+      - python glue_trans_w_adapters.py
+       --dir pre
+       --mask_dir /mnt/output_path/BERT-Tickets/mnli/checkpoint-257691/mask.pt
+       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2/checkpoint-257691
+       --logging_steps 12271
+       --task_name mnli
+       --only_train_adapters
+       --cache_dir /mnt/output_path/BERT-Tickets/mnli
+       --model_name_or_path bert-base-uncased
+       --do_train
+       --do_eval
+       --max_seq_length 128
+       --per_gpu_train_batch_size 32
+       --learning_rate 1e-4
+       --num_train_epochs 10
+       --overwrite_output_dir
+       --evaluate_during_training
+       --save_steps 0
+       --eval_all_checkpoints
+       --seed 5

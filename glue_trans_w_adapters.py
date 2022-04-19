@@ -46,7 +46,7 @@ from transformers import (
 )
 from transformers import get_linear_schedule_with_warmup
 from transformers import glue_compute_metrics as compute_metrics
-
+from transformers.adapters import AdapterConfig
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -532,6 +532,7 @@ def main():
         help="The name of the glue task",
         choices=list(task_to_keys.keys()),
     )
+    parser.add_argument("--only_train_adapters", action="store_true", help="Whether to run training.")
     parser.add_argument(
         "--output_dir",
         default=None,
@@ -694,6 +695,13 @@ def main():
     elif args.dir == 'rand':
         model = AutoModelForSequenceClassification.from_config(config=config)
 
+    config = AdapterConfig(mh_adapter=True, output_adapter=True, reduction_factor=16, non_linearity="relu")
+    model.add_adapter("bottleneck_adapter", config=config)
+    model.set_active_adapters("bottleneck_adapter")
+    if args.only_train_adapters:
+        model.train_adapter("bottleneck_adapter")
+    print(f"Total number of parameters of the model: {model.num_parameters(only_trainable=False)}")
+    print(f"Fine-tuned number of parameters of the model: {model.num_parameters(only_trainable=True)}")
     model.to(args.device)
 
     if args.weight_pertub:

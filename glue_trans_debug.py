@@ -365,9 +365,9 @@ def train(args, train_dataset, eval_dataset, model, tokenizer):
     if args.local_rank in [-1, 0]:
         tb_writer.close()
 
-    # results = evaluate(args, model, tokenizer)
-    # record_result.append(results)
-    # torch.save(record_result, os.path.join(args.output_dir, "result.pt"))
+    results = evaluate(args, model, tokenizer)
+    record_result.append(results)
+    torch.save(record_result, os.path.join(args.output_dir, "result.pt"))
 
     return global_step, tr_loss / global_step
 
@@ -494,7 +494,8 @@ def prepare_datasets(args, model, raw_datasets, tokenizer, num_labels):
     )
 
     train_dataset = processed_datasets["train"]
-    eval_dataset = processed_datasets["validation_matched" if args.task_name == "mnli" else "validation"]
+    eval_dataset = processed_datasets["test"]
+    #eval_dataset = processed_datasets["validation_matched" if args.task_name == "mnli" else "validation"]
     
     return train_dataset, eval_dataset
 
@@ -675,7 +676,7 @@ def main():
     set_seed(args)
 
     # Prepare GLUE task
-    raw_datasets = load_dataset("glue", args.task_name, cache_dir=args.cache_dir)
+    raw_datasets = load_dataset("glue", args.task_name, split="train[:100]").train_test_split(0.2, seed=42)
     label_list = raw_datasets["train"].features["label"].names
     num_labels = len(label_list)
 
@@ -690,7 +691,7 @@ def main():
         os.makedirs(args.output_dir)
 
     if args.dir == 'pre':
-        model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, config=config, cache_dir=args.cache_dir)
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, config=config)
     elif args.dir == 'rand':
         model = AutoModelForSequenceClassification.from_config(config=config)
 
