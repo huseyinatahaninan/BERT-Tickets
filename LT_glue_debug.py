@@ -252,11 +252,11 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, orig):
     tr_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
     train_iterator = trange(
-        epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=True,
+        epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0],
     )
     set_seed(args)  # Added here for reproductibility
     for _ in train_iterator:
-        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=True)
+        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
 
             # Skip past any already trained steps if resuming training
@@ -427,7 +427,7 @@ def evaluate(args, eval_dataset, model, tokenizer, prefix=""):
     nb_eval_steps = 0
     preds = None
     out_label_ids = None
-    for batch in tqdm(eval_dataloader, desc="Evaluating", disable=True):
+    for batch in tqdm(eval_dataloader, desc="Evaluating"):
         model.eval()
         for k, v in batch.items():
             batch[k] = v.to(args.device)
@@ -525,7 +525,8 @@ def prepare_datasets(args, model, raw_datasets, tokenizer, num_labels):
     )
 
     train_dataset = processed_datasets["train"]
-    eval_dataset = processed_datasets["validation_matched" if args.task_name == "mnli" else "validation"]
+    eval_dataset = processed_datasets["test"]
+    #eval_dataset = processed_datasets["validation_matched" if args.task_name == "mnli" else "validation"]
     
     return train_dataset, eval_dataset
 
@@ -687,7 +688,7 @@ def main():
     set_seed(args)
 
     # Prepare GLUE task
-    raw_datasets = load_dataset("glue", args.task_name, cache_dir=args.cache_dir)
+    raw_datasets = load_dataset("glue", args.task_name, split="train[:100]").train_test_split(0.2, seed=42)
     label_list = raw_datasets["train"].features["label"].names
     num_labels = len(label_list)
 

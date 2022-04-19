@@ -1,0 +1,58 @@
+# For field details: https://amulet-docs.azurewebsites.net/config_file.html
+description: Unstructured pruning BERT on GLUE benchmark 
+
+# Docker environment (repo/image:tag)
+# Install custom dependencies in the image using the optional "image_setup" field
+# Set up the container and environment using the optional "setup" field
+# Use a target that you have access
+target:
+  service: amlk8s
+  name: itphyperdgx2cl1
+  vc: hai7a
+
+environment:
+  registry: nvcr.io
+  image: nvidia/pytorch:21.09-py3
+  setup:
+   - pip install torch==1.9.1
+   - pip install transformers==4.10.3
+   - pip install tokenizers==0.10.3
+   - pip install datasets==1.12.1
+
+# Experiment source code. This section is optional.
+# $CONFIG_DIR is expanded to the directory of this config file.
+code:
+  local_dir: $CONFIG_DIR/..
+
+storage:
+  input_path:
+    # You should use your own blob here
+    storage_account_name: huinan
+    container_name: amulet
+  output_path:
+    # You should use your own blob here
+    storage_account_name: huinan
+    container_name: amulet
+
+# SKU usage: G1 (single GPU), G4 (quad GPU), G4-V100 (1 machine, 4 V100 gpus), etc...
+jobs:
+  - name: BERT-unstructured-pruning-mnli
+    sku: G1
+    command:
+      - python LT_glue.py
+        --output_dir /mnt/output_path/BERT-Tickets/mnli
+        --logging_steps 36813 
+        --task_name mnli 
+        --cache_dir /mnt/output_path/BERT-Tickets/mnli
+        --model_name_or_path bert-base-uncased 
+        --do_train 
+        --do_eval 
+        --max_seq_length 128 
+        --per_gpu_train_batch_size 32 
+        --learning_rate 2e-5 
+        --num_train_epochs 30 
+        --overwrite_output_dir 
+        --evaluate_during_training 
+        --save_steps 36813
+        --eval_all_checkpoints 
+        --seed 57
