@@ -85,7 +85,7 @@ jobs:
       - python glue_trans_w_adapters.py
        --dir pre
        --mask_dir /mnt/output_path/BERT-Tickets/mnli/checkpoint-257691/mask.pt
-       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2/checkpoint-257691
+       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2
        --logging_steps 12271
        --task_name mnli
        --cache_dir /mnt/output_path/BERT-Tickets/mnli
@@ -107,7 +107,7 @@ jobs:
       - python glue_trans_w_adapters.py
        --dir pre
        --mask_dir /mnt/output_path/BERT-Tickets/mnli/checkpoint-257691/mask.pt
-       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2/checkpoint-257691
+       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2
        --logging_steps 12271
        --task_name mnli
        --only_train_adapters
