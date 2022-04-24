@@ -44,7 +44,7 @@ from transformers import (
     SchedulerType,
     default_data_collator,
 )
-from transformers import get_linear_schedule_with_warmup
+from transformers import get_linear_schedule_with_warmup, get_constant_schedule
 from transformers import glue_compute_metrics as compute_metrics
 
 import opacus
@@ -223,9 +223,10 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
     ]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
-    scheduler = get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
-    )
+    # scheduler = get_linear_schedule_with_warmup(
+    #     optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
+    # )
+    scheduler = get_constant_schedule(optimizer)
     privacy_engine.attach(optimizer)
 
     # Check if saved optimizer or scheduler states exist
@@ -401,9 +402,9 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
     if args.local_rank in [-1, 0]:
         tb_writer.close()
 
-    results = evaluate(args, model, tokenizer)
-    record_result.append(results)
-    torch.save(record_result, os.path.join(args.output_dir, "result.pt"))
+    # results = evaluate(args, model, tokenizer)
+    # record_result.append(results)
+    # torch.save(record_result, os.path.join(args.output_dir, "result.pt"))
 
     return global_step, tr_loss / global_step
 
