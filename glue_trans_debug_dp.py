@@ -154,13 +154,13 @@ def pruning_model_custom(model, mask_dict):
 
 def transfer_grad_samples(model):
     for ii in range(12):
-        model.bert.encoder.layer[ii].attention.self.query.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.query.weight.grad_sample
-        model.bert.encoder.layer[ii].attention.self.key.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.key.weight.grad_sample
-        model.bert.encoder.layer[ii].attention.self.value.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.value.weight.grad_sample
-        model.bert.encoder.layer[ii].attention.output.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.output.dense.weight.grad_sample
-        model.bert.encoder.layer[ii].intermediate.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].intermediate.dense.weight.grad_sample
-        model.bert.encoder.layer[ii].output.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].output.dense.weight.grad_sample
-    model.bert.pooler.dense.weight_orig.grad_sample = model.bert.pooler.dense.weight.grad_sample
+        model.bert.encoder.layer[ii].attention.self.query.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.query.weight.grad_sample * model.bert.encoder.layer[ii].attention.self.query.weight_mask
+        model.bert.encoder.layer[ii].attention.self.key.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.key.weight.grad_sample * model.bert.encoder.layer[ii].attention.self.key.weight_mask
+        model.bert.encoder.layer[ii].attention.self.value.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.value.weight.grad_sample * model.bert.encoder.layer[ii].attention.self.value.weight_mask
+        model.bert.encoder.layer[ii].attention.output.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.output.dense.weight.grad_sample * model.bert.encoder.layer[ii].attention.output.dense.weight_mask
+        model.bert.encoder.layer[ii].intermediate.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].intermediate.dense.weight.grad_sample * model.bert.encoder.layer[ii].intermediate.dense.weight_mask
+        model.bert.encoder.layer[ii].output.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].output.dense.weight.grad_sample * model.bert.encoder.layer[ii].output.dense.weight_mask
+    model.bert.pooler.dense.weight_orig.grad_sample = model.bert.pooler.dense.weight.grad_sample * model.bert.pooler.dense.weight_mask
 
 
 def clear_grad_samples(model):
@@ -223,10 +223,10 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
     ]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
+    privacy_engine.attach(optimizer)
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
     )
-    privacy_engine.attach(optimizer)
 
     # Check if saved optimizer or scheduler states exist
     if os.path.isfile(os.path.join(args.model_name_or_path, "optimizer.pt")) and os.path.isfile(
@@ -342,7 +342,7 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
 
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
-                model.zero_grad()
+                optimizer.zero_grad()
                 clear_grad_samples(model)
                 global_step += 1
 
@@ -752,6 +752,10 @@ def main():
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
 
     train_dataset, eval_dataset = prepare_datasets(args, model, raw_datasets, tokenizer, num_labels)
+
+    # for n, p in model.named_parameters():
+    #     if n.__contains__("weight_orig"):
+    #         p.requires_grad = False
 
     # Ignore distributed training for now
     model.train()

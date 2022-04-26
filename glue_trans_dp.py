@@ -154,13 +154,13 @@ def pruning_model_custom(model, mask_dict):
 
 def transfer_grad_samples(model):
     for ii in range(12):
-        model.bert.encoder.layer[ii].attention.self.query.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.query.weight.grad_sample
-        model.bert.encoder.layer[ii].attention.self.key.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.key.weight.grad_sample
-        model.bert.encoder.layer[ii].attention.self.value.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.value.weight.grad_sample
-        model.bert.encoder.layer[ii].attention.output.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.output.dense.weight.grad_sample
-        model.bert.encoder.layer[ii].intermediate.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].intermediate.dense.weight.grad_sample
-        model.bert.encoder.layer[ii].output.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].output.dense.weight.grad_sample
-    model.bert.pooler.dense.weight_orig.grad_sample = model.bert.pooler.dense.weight.grad_sample
+        model.bert.encoder.layer[ii].attention.self.query.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.query.weight.grad_sample * model.bert.encoder.layer[ii].attention.self.query.weight_mask
+        model.bert.encoder.layer[ii].attention.self.key.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.key.weight.grad_sample * model.bert.encoder.layer[ii].attention.self.key.weight_mask
+        model.bert.encoder.layer[ii].attention.self.value.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.self.value.weight.grad_sample * model.bert.encoder.layer[ii].attention.self.value.weight_mask
+        model.bert.encoder.layer[ii].attention.output.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].attention.output.dense.weight.grad_sample * model.bert.encoder.layer[ii].attention.output.dense.weight_mask
+        model.bert.encoder.layer[ii].intermediate.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].intermediate.dense.weight.grad_sample * model.bert.encoder.layer[ii].intermediate.dense.weight_mask
+        model.bert.encoder.layer[ii].output.dense.weight_orig.grad_sample = model.bert.encoder.layer[ii].output.dense.weight.grad_sample * model.bert.encoder.layer[ii].output.dense.weight_mask
+    model.bert.pooler.dense.weight_orig.grad_sample = model.bert.pooler.dense.weight.grad_sample * model.bert.pooler.dense.weight_mask
 
 
 def clear_grad_samples(model):
@@ -223,11 +223,11 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
     ]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
+    privacy_engine.attach(optimizer)
     # scheduler = get_linear_schedule_with_warmup(
     #     optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
     # )
     scheduler = get_constant_schedule(optimizer)
-    privacy_engine.attach(optimizer)
 
     # Check if saved optimizer or scheduler states exist
     if os.path.isfile(os.path.join(args.model_name_or_path, "optimizer.pt")) and os.path.isfile(
@@ -328,7 +328,8 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
                     scaled_loss.backward()
             else:
                 loss.backward()
-                transfer_grad_samples(model)
+                if args.mask_dir:
+                    transfer_grad_samples(model)
 
             tr_loss += loss.item()
             if (step + 1) % args.gradient_accumulation_steps == 0 or (
@@ -344,7 +345,8 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
                 model.zero_grad()
-                clear_grad_samples(model)
+                if args.mask_dir:
+                    clear_grad_samples(model)
                 global_step += 1
 
                 if args.local_rank in [-1, 0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
@@ -390,7 +392,8 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
                     logger.info("Saving optimizer and scheduler states to %s", output_dir)
             else:
                 optimizer.virtual_step()
-                clear_grad_samples(model)
+                if args.mask_dir:
+                    clear_grad_samples(model)
 
             if args.max_steps > 0 and global_step > args.max_steps:
                 epoch_iterator.close()
@@ -614,7 +617,8 @@ def main():
         help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     parser.add_argument("--per_sample_max_grad_norm", default=1.0, type=float, help="DP per sample max grad norm.")
-    parser.add_argument("--target_epsilon", default=4.0, type=float, help="DP target epsilon.")
+    parser.add_argument("--target_epsilon", default=0.0, type=float, help="DP target epsilon.")
+    parser.add_argument("--noise_multiplier", default=0.0, type=float, help="DP noise multiplier.")
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
     parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
@@ -753,13 +757,31 @@ def main():
 
     train_dataset, eval_dataset = prepare_datasets(args, model, raw_datasets, tokenizer, num_labels)
 
+    # for n, p in model.named_parameters():
+    #     if n.__contains__("weight_orig"):
+    #         p.requires_grad = False
+
     # Ignore distributed training for now
     model.train()
-    privacy_engine = opacus.PrivacyEngine(module=model,
-        batch_size=args.per_gpu_train_batch_size*args.gradient_accumulation_steps, sample_size=len(train_dataset),
-        max_grad_norm=args.per_sample_max_grad_norm, epochs=args.num_train_epochs,
-        target_epsilon=args.target_epsilon, target_delta=1.0/len(train_dataset)
-    )
+    if args.target_epsilon > 0.0 and args.noise_multiplier == 0.0:
+        privacy_engine = opacus.PrivacyEngine(module=model,
+            batch_size=args.per_gpu_train_batch_size*args.gradient_accumulation_steps, sample_size=len(train_dataset),
+            max_grad_norm=args.per_sample_max_grad_norm, epochs=args.num_train_epochs,
+            target_epsilon=args.target_epsilon, target_delta=1.0/len(train_dataset)
+        )
+    elif args.target_epsilon == 0.0:
+        privacy_engine = opacus.PrivacyEngine(module=model,
+            batch_size=args.per_gpu_train_batch_size*args.gradient_accumulation_steps, sample_size=len(train_dataset),
+            max_grad_norm=args.per_sample_max_grad_norm, epochs=args.num_train_epochs, noise_multiplier=args.noise_multiplier,
+            target_delta=1.0/len(train_dataset)
+        )
+    else:
+        raise Exception("something is wrong with target_epsilon/noise_multiplier")
+
+    logger.info(f"Noise multiplier is: {privacy_engine.noise_multiplier}")
+
+    logger.info(f"Number of total parameters: {model.num_parameters(only_trainable=False)}")
+    logger.info(f"Number of trainable parameters: {model.num_parameters(only_trainable=True)}")
 
     logger.info("Training/evaluation parameters %s", args)
 
