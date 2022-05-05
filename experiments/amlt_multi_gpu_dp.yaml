@@ -64,6 +64,33 @@ jobs:
        --save_steps 0
        --eval_all_checkpoints
        --seed 5
+  - name: BERT-unstructured-pruning-mnli-part2-DPDDP-G16-pruned50-b16-acc4-ep50
+    sku: G16
+    command:
+      - python -m torch.distributed.run --nproc_per_node=16 glue_trans_multi_gpu_dp.py
+       --dir pre
+       --mask_dir /mnt/output_path/BERT-Tickets/mnli/checkpoint-184065/mask.pt
+       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2
+       --logging_steps 50
+       --task_name mnli
+       --cache_dir /mnt/output_path/BERT-Tickets/mnli
+       --model_name_or_path bert-base-uncased
+       --do_train
+       --do_eval
+       --max_seq_length 128
+       --per_gpu_train_batch_size 16
+       --gradient_accumulation_steps 4
+       --per_sample_max_grad_norm 1.0
+       --target_epsilon 4.0
+       --learning_rate 1e-4
+       --num_train_epochs 50
+       --weight_decay 1e-2
+       --max_grad_norm 0.0
+       --overwrite_output_dir
+       --evaluate_during_training
+       --save_steps 0
+       --eval_all_checkpoints
+       --seed 5
   - name: BERT-full-no_pruning-mnli-DPDDP-G16-b16-acc4-ep50
     sku: G16
     command:
