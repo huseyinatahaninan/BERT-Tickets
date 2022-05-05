@@ -405,6 +405,7 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, orig, privacy_eng
                     ]
 
                     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
+                    model.train()
                     privacy_engine.attach(optimizer)
                     # scheduler = get_linear_schedule_with_warmup(
                     #     optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
