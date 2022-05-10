@@ -23,7 +23,7 @@ environment:
 # Experiment source code. This section is optional.
 # $CONFIG_DIR is expanded to the directory of this config file.
 code:
-  local_dir: $CONFIG_DIR/..
+  local_dir: $CONFIG_DIR/../..
 
 storage:
   input_path:
@@ -36,38 +36,37 @@ storage:
     container_name: amulet
 
 # SKU usage: G1 (single GPU), G4 (quad GPU), G4-V100 (1 machine, 4 V100 gpus), etc...
+# part1 -> 392702//1024 * 3 epochs logging_steps and noise_multiplier=0.82 chosen such that 15 epochs + 50 epochs reaches eps=4.0
 jobs:
-  - name: BERT-unstructured-pruning-mnli-part1-DP-part2-DPDDP-G16-pruned40-b16-acc4-ep50
-    sku: G16
+  - name: BERT-unstructured-pruning-mnli-part1-DP
+    sku: G1
     command:
-      - python -m torch.distributed.run --nproc_per_node=16 glue_trans_multi_gpu_dp.py
-       --dir pre
-       --mask_dir /mnt/output_path/BERT-Tickets/mnli/DP/checkpoint-4596/mask.pt
-       --output_dir /mnt/output_path/BERT-Tickets/mnli/part2
-       --logging_steps 50
-       --task_name mnli
-       --cache_dir /mnt/output_path/BERT-Tickets/mnli
-       --model_name_or_path bert-base-uncased
-       --do_train
-       --do_eval
-       --max_seq_length 128
-       --per_gpu_train_batch_size 16
-       --gradient_accumulation_steps 4
-       --per_sample_max_grad_norm 1.0
-       --noise_multiplier 0.82
-       --learning_rate 1e-4
-       --num_train_epochs 50
-       --weight_decay 1e-2
-       --max_grad_norm 0.0
-       --overwrite_output_dir
-       --evaluate_during_training
-       --save_steps 0
-       --eval_all_checkpoints
-       --seed 5
-  - name: BERT-unstructured-pruning-mnli-part2-DPDDP-G16-pruned50-b16-acc4-ep50
-    sku: G16
+      - python LT_glue_dp.py
+        --output_dir /mnt/output_path/BERT-Tickets/mnli/DP
+        --logging_steps 1149 
+        --task_name mnli 
+        --cache_dir /mnt/output_path/BERT-Tickets/mnli
+        --model_name_or_path bert-base-uncased 
+        --do_train 
+        --do_eval 
+        --max_seq_length 128 
+        --per_gpu_train_batch_size 16 
+        --gradient_accumulation_steps 64
+        --per_sample_max_grad_norm 1.0
+        --noise_multiplier 0.82 
+        --learning_rate 1e-4
+        --num_train_epochs 30 
+        --weight_decay 1e-2
+        --max_grad_norm 0.0
+        --overwrite_output_dir 
+        --evaluate_during_training 
+        --save_steps 1149 
+        --eval_all_checkpoints 
+        --seed 57
+  - name: BERT-unstructured-pruning-mnli-part2-DP-pruned50-b32-acc32-ep20
+    sku: G1
     command:
-      - python -m torch.distributed.run --nproc_per_node=16 glue_trans_multi_gpu_dp.py
+      - python glue_trans_dp.py
        --dir pre
        --mask_dir /mnt/output_path/BERT-Tickets/mnli/checkpoint-184065/mask.pt
        --output_dir /mnt/output_path/BERT-Tickets/mnli/part2
@@ -78,12 +77,12 @@ jobs:
        --do_train
        --do_eval
        --max_seq_length 128
-       --per_gpu_train_batch_size 16
-       --gradient_accumulation_steps 4
+       --per_gpu_train_batch_size 32
+       --gradient_accumulation_steps 32
        --per_sample_max_grad_norm 1.0
        --target_epsilon 4.0
        --learning_rate 1e-4
-       --num_train_epochs 50
+       --num_train_epochs 20
        --weight_decay 1e-2
        --max_grad_norm 0.0
        --overwrite_output_dir
@@ -91,10 +90,10 @@ jobs:
        --save_steps 0
        --eval_all_checkpoints
        --seed 5
-  - name: BERT-full-no_pruning-mnli-DPDDP-G16-b16-acc4-ep50
-    sku: G16
+  - name: BERT-full-no_pruning-mnli-DP-b16-acc64-ep20-eps4
+    sku: G1
     command:
-      - python -m torch.distributed.run --nproc_per_node=16 glue_trans_multi_gpu_dp.py
+      - python glue_trans_dp.py
        --dir pre
        --output_dir /mnt/output_path/BERT-Tickets/mnli/part2
        --logging_steps 50
@@ -105,12 +104,12 @@ jobs:
        --do_eval
        --max_seq_length 128
        --per_gpu_train_batch_size 16
-       --gradient_accumulation_steps 4
+       --gradient_accumulation_steps 64
        --per_sample_max_grad_norm 1.0
        --target_epsilon 4.0
        --noise_multiplier 0.0
        --learning_rate 1e-4
-       --num_train_epochs 50
+       --num_train_epochs 20
        --weight_decay 1e-2
        --max_grad_norm 0.0
        --overwrite_output_dir
