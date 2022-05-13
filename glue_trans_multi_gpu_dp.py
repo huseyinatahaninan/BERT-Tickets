@@ -335,7 +335,10 @@ def train(args, train_dataset, eval_dataset, model, tokenizer, privacy_engine):
                         print(f"eval total number of sample: {n_samples}")
 
                     results = {}
-                    results[args.task_name + "/acc"] = eval_acc
+                    if args.task_name == "mnli":
+                        results[args.task_name + "/acc"] = eval_acc
+                    else:
+                        results["acc"] = eval_acc
 
                     if args.local_rank in [-1, 0]:
                         logs = {}
@@ -430,7 +433,10 @@ def evaluate(args, eval_dataset, model, tokenizer, prefix=""):
 
     result = compute_metrics(args.task_name, preds, out_label_ids)
 
-    acc = result[args.task_name + "/acc"]
+    if args.task_name == "mnli":
+        acc = result[args.task_name + "/acc"]
+    else:
+        acc = result["acc"]
     n_samples = preds.shape[0]
     
     return torch.tensor(acc*n_samples).to(args.device), torch.tensor(n_samples).to(args.device)
