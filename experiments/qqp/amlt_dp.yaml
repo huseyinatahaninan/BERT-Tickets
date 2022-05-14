@@ -1,0 +1,119 @@
+# For field details: https://amulet-docs.azurewebsites.net/config_file.html
+description: Unstructured pruning BERT on GLUE benchmark 
+
+# Docker environment (repo/image:tag)
+# Install custom dependencies in the image using the optional "image_setup" field
+# Set up the container and environment using the optional "setup" field
+# Use a target that you have access
+target:
+  service: amlk8s
+  name: itphyperdgx2cl1
+  vc: hai7a
+
+environment:
+  registry: nvcr.io
+  image: nvidia/pytorch:21.09-py3
+  setup:
+   - pip install torch==1.9.1
+   - pip install transformers==4.10.3
+   - pip install tokenizers==0.10.3
+   - pip install datasets==1.12.1
+   - pip install opacus==0.15.0
+
+# Experiment source code. This section is optional.
+# $CONFIG_DIR is expanded to the directory of this config file.
+code:
+  local_dir: $CONFIG_DIR/../..
+
+storage:
+  input_path:
+    # You should use your own blob here
+    storage_account_name: huinan
+    container_name: amulet
+  output_path:
+    # You should use your own blob here
+    storage_account_name: huinan
+    container_name: amulet
+
+# SKU usage: G1 (single GPU), G4 (quad GPU), G4-V100 (1 machine, 4 V100 gpus), etc...
+# part1 -> 363846//1024 * 3 epochs logging_steps and noise_multiplier=0.8201416 chosen such that 15 epochs + 50 epochs reaches eps=4.0
+jobs:
+  - name: BERT-unstructured-pruning-qqp-part1-DP
+    sku: G1
+    command:
+      - python LT_glue_dp.py
+        --output_dir /mnt/output_path/BERT-Tickets/qqp/DP
+        --logging_steps 1065
+        --task_name qqp
+        --cache_dir /mnt/output_path/BERT-Tickets/qqp
+        --model_name_or_path bert-base-uncased
+        --do_train
+        --do_eval
+        --max_seq_length 128
+        --per_gpu_train_batch_size 16
+        --gradient_accumulation_steps 64
+        --per_sample_max_grad_norm 1.0
+        --noise_multiplier 0.8201416
+        --learning_rate 1e-4
+        --num_train_epochs 30
+        --weight_decay 1e-2
+        --max_grad_norm 0.0
+        --overwrite_output_dir
+        --evaluate_during_training
+        --save_steps 1065
+        --eval_all_checkpoints
+        --seed 57
+  - name: BERT-unstructured-pruning-qqp-part2-DP-pruned50-b32-acc32-ep20
+    sku: G1
+    command:
+      - python glue_trans_dp.py
+       --dir pre
+       --mask_dir /mnt/output_path/BERT-Tickets/qqp/checkpoint-184065/mask.pt
+       --output_dir /mnt/output_path/BERT-Tickets/qqp/part2
+       --logging_steps 50
+       --task_name qqp
+       --cache_dir /mnt/output_path/BERT-Tickets/qqp
+       --model_name_or_path bert-base-uncased
+       --do_train
+       --do_eval
+       --max_seq_length 128
+       --per_gpu_train_batch_size 32
+       --gradient_accumulation_steps 32
+       --per_sample_max_grad_norm 1.0
+       --target_epsilon 4.0
+       --learning_rate 1e-4
+       --num_train_epochs 20
+       --weight_decay 1e-2
+       --max_grad_norm 0.0
+       --overwrite_output_dir
+       --evaluate_during_training
+       --save_steps 0
+       --eval_all_checkpoints
+       --seed 5
+  - name: BERT-full-no_pruning-qqp-DP-b16-acc64-ep20-eps4
+    sku: G1
+    command:
+      - python glue_trans_dp.py
+       --dir pre
+       --output_dir /mnt/output_path/BERT-Tickets/qqp/part2
+       --logging_steps 50
+       --task_name qqp
+       --cache_dir /mnt/output_path/BERT-Tickets/qqp
+       --model_name_or_path bert-base-uncased
+       --do_train
+       --do_eval
+       --max_seq_length 128
+       --per_gpu_train_batch_size 16
+       --gradient_accumulation_steps 64
+       --per_sample_max_grad_norm 1.0
+       --target_epsilon 4.0
+       --noise_multiplier 0.0
+       --learning_rate 1e-4
+       --num_train_epochs 20
+       --weight_decay 1e-2
+       --max_grad_norm 0.0
+       --overwrite_output_dir
+       --evaluate_during_training
+       --save_steps 0
+       --eval_all_checkpoints
+       --seed 5
