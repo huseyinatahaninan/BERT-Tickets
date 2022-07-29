@@ -431,7 +431,10 @@ def evaluate(args, eval_dataset, model, tokenizer, prefix=""):
     # elif args.output_mode == "regression":
     #     preds = np.squeeze(preds)
 
-    result = compute_metrics(args.task_name, preds, out_label_ids)
+    if args.task_name == "sst2":
+        result = compute_metrics("sst-2", preds, out_label_ids)
+    else:
+        result = compute_metrics(args.task_name, preds, out_label_ids)
 
     if args.task_name == "mnli":
         acc = result[args.task_name + "/acc"]

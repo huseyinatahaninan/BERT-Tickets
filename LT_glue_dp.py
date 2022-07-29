@@ -499,7 +499,10 @@ def evaluate(args, eval_dataset, model, tokenizer, prefix=""):
     #     preds = np.argmax(preds, axis=1)
     # elif args.output_mode == "regression":
     #     preds = np.squeeze(preds)
-    result = compute_metrics(args.task_name, preds, out_label_ids)
+    if args.task_name == "sst2":
+        result = compute_metrics("sst-2", preds, out_label_ids)
+    else:
+        result = compute_metrics(args.task_name, preds, out_label_ids)
     results.update(result)
 
     output_eval_file = os.path.join(args.output_dir, prefix, "eval_results.txt")
